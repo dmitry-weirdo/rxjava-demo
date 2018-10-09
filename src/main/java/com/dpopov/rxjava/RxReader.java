@@ -1,3 +1,5 @@
+package com.dpopov.rxjava;
+
 import io.reactivex.Observable;
 import io.reactivex.schedulers.Schedulers;
 
