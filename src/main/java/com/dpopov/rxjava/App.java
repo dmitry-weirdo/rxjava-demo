@@ -21,14 +21,14 @@ public class App {
             .subscribe(System.out::println)
         ;
 
-        printSeparator();
+        Utils.printSeparator();
 
         // actually returns a Disposable, but we don't care for now
         Observable.range(1, 10)
             .subscribe(i -> System.out.printf("Number from range: %d \n", i) )
         ;
 
-        printSeparator();
+        Utils.printSeparator();
 
         // subscribe to fakeUserInput
         System.out.println("Fake user input:");
@@ -42,7 +42,7 @@ public class App {
             .blockingSubscribe(System.out::println) // blockingSubscribe subscribe on the current thread
         ;
 
-        printSeparator();
+        Utils.printSeparator();
     }
 
     private static Observable<Integer> fakeUserInput() {
@@ -62,9 +62,5 @@ public class App {
             )
             .filter(i -> i > 3) // filter out values less than 3
         ;
-    }
-
-    private static void printSeparator() {
-        System.out.println("===================================");
     }
 }
