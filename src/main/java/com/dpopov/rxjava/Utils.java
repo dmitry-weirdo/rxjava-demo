@@ -8,4 +8,11 @@ public final class Utils {
     public static void printSeparator() {
         System.out.println("===================================");
     }
+
+
+    public static void log(final Class clazz, final String s) {
+        // todo: use logger
+        System.out.printf("[%s] %s \n", clazz.getSimpleName(), s);
+    }
+
 }

@@ -86,6 +86,7 @@ public class MultipleSubscribers {
             subscriber.onNext( getValue(1) );
             subscriber.onNext( getValue(2) );
         } )
+            .doOnNext( i -> log( String.format("doOnNext. Value: %d", i) ) )
             .doOnDispose( () -> log("Clearing Observable resources on dispose.") ) // doOnDispose replaced doOnUnsubscribe
             .doFinally( () -> log("Clearing Observable resources on finally.") )
         ;
@@ -97,7 +98,6 @@ public class MultipleSubscribers {
     }
 
     private static void log(final String s) {
-        // todo: use logger
-        System.out.printf("[%s] %s \n", MultipleSubscribers.class.getSimpleName(), s);
+        Utils.log(MultipleSubscribers.class, s);
     }
 }
