@@ -3,7 +3,9 @@ package com.dpopov.rxjava.v1;
 import com.dpopov.rxjava.Utils;
 import org.junit.Assert;
 import rx.Observable;
+import rx.Subscription;
 import rx.observables.BlockingObservable;
+import rx.observables.ConnectableObservable;
 import rx.schedulers.Schedulers;
 
 import java.util.concurrent.TimeUnit;
@@ -14,7 +16,8 @@ import java.util.concurrent.TimeUnit;
 public class ObservableBasics {
     public static void main(String[] args) throws InterruptedException {
         trySimpleObservables();
-        trySchedulers();
+//        trySchedulers();
+        tryConnectableObservables();
     }
 
     private static void trySimpleObservables() {
@@ -290,6 +293,93 @@ public class ObservableBasics {
         ;
 
         Thread.sleep(1000);
+
+        Utils.printSeparator();
+    }
+
+
+    private static void tryConnectableObservables() throws InterruptedException {
+        Utils.printMethodStart("tryConnectableObservables");
+
+        final StringBuilder sb = new StringBuilder("<start>");
+
+        final Observable<Long> observable = Observable.interval(200, TimeUnit.MILLISECONDS); // gets 0, 1, 2,.. in the given time interval
+        final ConnectableObservable<Long> connectableObservable = observable.publish(); // publish gets ConnectableObservable from Observable
+        final Observable<Long> coWithDoOnUnsubscribe = connectableObservable.doOnUnsubscribe(() -> log("[ConnectableObservable 1].doOnUnsubscribe"));// must execute when subscribers unsubscribed from this ConnectableObservable
+
+        Thread.sleep(300);
+
+        // emitting events does not start before ConnectableObservable#connect called
+        final Subscription subscription = coWithDoOnUnsubscribe.subscribe(sb::append);
+        log("sb after subscribe, but before connect: " + sb.toString());
+        Assert.assertEquals("<start>", sb.toString());
+
+        connectableObservable.connect();
+        Thread.sleep(700);
+        log("sb after subscribe, but before connect: " + sb.toString());
+        Assert.assertEquals("<start>012", sb.toString());
+
+        subscription.unsubscribe();
+        log("Subscriber unsubscribed.");
+
+        Assert.assertTrue( subscription.isUnsubscribed() );
+
+        Utils.printSeparator();
+
+        final ConnectableObservable<Long> connectable2 = Observable.interval(200, TimeUnit.MILLISECONDS).publish();
+        final Observable<Long> autoConnect = connectable2.autoConnect(2);// auto-connect after 2 subscribers
+
+        // !!! to execute autoConnect, subscribers must subscribe not to the initial ConnectableObservable, but to Observable gotten from ConnectableObservable#autoConnect
+        Thread.sleep(100);
+        log("Subscribing subscriber 1...");
+        final Subscription subscription1 = autoConnect.subscribe(l -> log("[Subscriber 1]. Got number: " + l));
+        log("Subscriber 1 subscribed. AutoConnect not yet executed.");
+
+        Thread.sleep(400);
+        log("Subscribing subscriber 2...");
+        final Subscription subscription2 = autoConnect.subscribe(l -> log("[Subscriber 2]. Got number: " + l));
+        log("Subscriber 2 subscribed. AutoConnect must be executed.");
+
+        Thread.sleep(1000);
+
+//        connectable2.connect();
+//        log("Explicit connect called.");
+//        Thread.sleep(1000);
+
+
+        subscription1.unsubscribe();
+        log("Subscriber 1 unsubscribed.");
+        subscription2.unsubscribe();
+        log("Subscriber 2 unsubscribed.");
+
+        Thread.sleep(1000);
+
+        Utils.printSeparator();
+
+
+        // refCount -> makes ConnectableObservable behave as usual Observable, so no #connect call required
+        // @see http://reactivex.io/documentation/operators/refcount.html
+        final ConnectableObservable<Long> connectable3 = Observable.interval(200, TimeUnit.MILLISECONDS).publish();
+//        final Observable<Long> co3withDoOnUnsubscribe = connectable3.doOnUnsubscribe(() -> log("[ConnectableObservable 3].doOnUnsubscribe"));// RefCount Observable must unsubscribe from ConnectableObservable after all subscribers unsubscribed
+
+        final Observable<Long> refCount = connectable3.refCount();
+        final Observable<Long> refCountWithDoOnUnsubscribe = refCount.doOnUnsubscribe(() -> log("[RefCountSubscriber].doOnUnsubscribe"));// RefCount Observable must unsubscribe from ConnectableObservable after all subscribers unsubscribed
+
+        log("RefCount Observable created");
+        Thread.sleep(1000);
+
+        log("Subscribing RefCountSubscriber...");
+        final Subscription refCountSubscription = refCountWithDoOnUnsubscribe.subscribe(
+              l -> log("[RefCountSubscriber].onNext. Value: " + l)
+            , throwable -> log("[RefCountSubscriber].onError")
+            , () -> log("[RefCountSubscriber].onCompleted")
+        );
+        log("RefCountSubscriber subscribed.");
+
+        Thread.sleep(2000);
+
+        refCountSubscription.unsubscribe();
+        log("RefCountSubscriber unsubscribed.");
 
         Utils.printSeparator();
     }
