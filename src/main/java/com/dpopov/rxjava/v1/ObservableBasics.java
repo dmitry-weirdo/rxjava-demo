@@ -1,12 +1,16 @@
 package com.dpopov.rxjava.v1;
 
+import com.dpopov.rxjava.Holder;
 import com.dpopov.rxjava.Utils;
 import org.junit.Assert;
 import rx.Observable;
+import rx.Observer;
+import rx.Single;
 import rx.Subscription;
 import rx.observables.BlockingObservable;
 import rx.observables.ConnectableObservable;
 import rx.schedulers.Schedulers;
+import rx.subjects.PublishSubject;
 
 import java.util.concurrent.TimeUnit;
 
@@ -18,6 +22,9 @@ public class ObservableBasics {
         trySimpleObservables();
 //        trySchedulers();
         tryConnectableObservables();
+        trySingle();
+        trySubjects();
+        tryUsing();
     }
 
     private static void trySimpleObservables() {
@@ -380,6 +387,128 @@ public class ObservableBasics {
 
         refCountSubscription.unsubscribe();
         log("RefCountSubscriber unsubscribed.");
+
+        Utils.printSeparator();
+    }
+
+    private static void trySingle() {
+        Utils.printMethodStart("trySingle");
+
+        final StringBuilder sb = new StringBuilder();
+
+        final Single<String> single = Observable
+            .just("Hello")
+            .toSingle() // there also exists Single.create
+        ;
+
+        final Single<String> stringWithCallbacks = single
+            .doOnSuccess(sb::append)
+            .doOnError(e -> {
+                throw new RuntimeException(e);
+            })
+        ;
+
+        stringWithCallbacks.subscribe();
+        log("sb after subscribe: " + sb.toString());
+
+        Assert.assertEquals("Hello", sb.toString());
+
+        Utils.printSeparator();
+    }
+
+    private static void trySubjects() {
+        Utils.printMethodStart("trySubjects");
+
+        final Holder<Integer> holder1 = new Holder<>(0);
+        final Holder<Integer> holder2 = new Holder<>(0);
+
+        final PublishSubject<Integer> subject = PublishSubject.create();
+
+        // first values will be received by first observer/subscriber only
+        subject.subscribe( getFirstObserver(holder1) ); // subscribe is Observable method
+        log("Observer 1 subscribed");
+        subject.onNext(1); // onNext is Observer method implementation
+        subject.onNext(2);
+        subject.onNext(3);
+
+        // next values will be received by both observers/subscribers
+        subject.subscribe( getSecondObserver(holder2) ); // subscribe is Observable method
+        log("Observer 2 subscribed");
+        subject.onNext(4);
+
+        log("holder1.value: " + holder1.value);
+        log("holder2.value: " + holder2.value);
+
+        Assert.assertEquals((Integer) 10, holder1.value);
+        Assert.assertEquals((Integer) 4, holder2.value);
+
+        Utils.printSeparator();
+    }
+
+    private static Observer<Integer> getFirstObserver(final Holder<Integer> holder) {
+        return new Observer<Integer>() {
+            @Override
+            public void onCompleted() {
+                log("Observer 1 completed");
+            }
+
+            @Override
+            public void onError(final Throwable e) {
+                log("Observer 1.onError");
+                e.printStackTrace();
+            }
+
+            @Override
+            public void onNext(final Integer integer) {
+                log("Observer1.doNext: got value " + integer);
+                holder.value += integer; // todo: bydlocode of changing the external variable
+            }
+        };
+    }
+    private static Observer<Integer> getSecondObserver(final Holder<Integer> holder) {
+        return new Observer<Integer>() {
+            @Override
+            public void onCompleted() {
+                log("Observer 2 completed");
+            }
+
+            @Override
+            public void onError(final Throwable e) {
+                log("Observer 2.onError");
+                e.printStackTrace();
+            }
+
+            @Override
+            public void onNext(final Integer integer) {
+                log("Observer2.doNext: got value " + integer);
+                holder.value += integer; // todo: bydlocode of changing the external variable
+            }
+        };
+    }
+
+    private static void tryUsing() {
+        Utils.printMethodStart("tryUsing");
+
+        final StringBuilder sb = new StringBuilder("<start>");
+
+        final Observable<Character> values = Observable.using(
+              () -> "MyResource" // Func 0: () -> R, R is String in this case
+            , r -> Observable.create(subscriber -> {
+                for (final Character c : r.toCharArray()) {
+                    subscriber.onNext(c);
+                }
+
+                subscriber.onCompleted();
+            })
+            , r -> log("Disposed the resource: " + r)
+        );
+
+        values.subscribe(
+            sb::append
+        );
+
+        System.out.println("Sb after resource usage: " + sb.toString());
+        Assert.assertEquals("<start>MyResource", sb.toString());
 
         Utils.printSeparator();
     }
