@@ -507,7 +507,7 @@ public class ObservableBasics {
             sb::append
         );
 
-        System.out.println("Sb after resource usage: " + sb.toString());
+        log("Sb after resource usage: " + sb.toString());
         Assert.assertEquals("<start>MyResource", sb.toString());
 
         Utils.printSeparator();
