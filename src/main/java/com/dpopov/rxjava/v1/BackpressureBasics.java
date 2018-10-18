@@ -1,6 +1,7 @@
 package com.dpopov.rxjava.v1;
 
 import com.dpopov.rxjava.Utils;
+import rx.BackpressureOverflow;
 import rx.Observable;
 import rx.schedulers.Schedulers;
 import rx.subjects.PublishSubject;
@@ -32,6 +33,12 @@ public class BackpressureBasics {
     }
 
     private static void tryHotObservable() throws InterruptedException {
+        final int intStreamStart = 1;
+
+//        final int intStreamEnd = 1_000_000_000;
+        final int intStreamEnd = 1_00_000_000;
+
+
         Utils.printMethodStart("tryHotObservable");
 
         // Hot Observable that will fail with MissingBackpressureException
@@ -46,7 +53,7 @@ public class BackpressureBasics {
             .subscribe( ComputeFunction::compute, Throwable::printStackTrace )
         ;
 
-        IntStream.range(1, 1000000000) // does not honor backpressure, obviously
+        IntStream.range(intStreamStart, intStreamEnd) // does not honor backpressure, obviously
             .forEach(i -> {
 //                log("[IntStream]: emitting " + i);
                 source.onNext(i);
@@ -55,6 +62,63 @@ public class BackpressureBasics {
 
         Thread.sleep(5000);
 
+        Utils.printSeparator();
+
+
+        // skipping methods - just emit one value at some
+        log("Using sample");
+        final PublishSubject<Integer> subject = PublishSubject.create();
+
+        subject
+//            .throttleFirst(100, TimeUnit.MILLISECONDS)
+//            .throttleLast(100, TimeUnit.MILLISECONDS)
+            .sample(100, TimeUnit.MILLISECONDS)
+
+            .observeOn( Schedulers.computation() )
+            .subscribe( ComputeFunction::compute, Throwable::printStackTrace )
+        ;
+
+
+        IntStream.range(intStreamStart, intStreamEnd) // does not honor backpressure, obviously
+            .forEach(i -> {
+//                log("[IntStream]: emitting " + i);
+                subject.onNext(i);
+            })
+        ;
+
+        Utils.printSeparator();
+
+
+        // set up a backpressure buffer
+        log("Using onBackpressureBuffer");
+        Observable.range(1, 1_000_000)
+            .onBackpressureBuffer(
+                  10 // buffer capacity
+                , () -> { // action on buffer overflow
+//                    log("onBackpressureBuffer: buffer overflown");
+                }
+                , BackpressureOverflow.ON_OVERFLOW_DROP_OLDEST // Strategy on buffer overflow
+            )
+            .observeOn( Schedulers.computation() )
+            .subscribe( ComputeFunction::compute, Throwable::printStackTrace )
+        ;
+
+        Thread.sleep(5000);
+        Utils.printSeparator();
+
+
+        log("Using onBackpressureDrop");
+        Observable.range(1, 1_000_000)
+            .onBackpressureDrop(
+                i -> { // action on buffer overflow
+//                    log("onBackpressureDrop: dropped value " + i);
+                }
+            )
+            .observeOn( Schedulers.computation() )
+            .subscribe( ComputeFunction::compute, Throwable::printStackTrace )
+        ;
+
+        Thread.sleep(5000);
         Utils.printSeparator();
     }
 
